@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -40,17 +41,17 @@ var (
 	}
 )
 
-func StoreLatencyAndSizeInfo(opType string, size float64, latency float64) {
+func StoreLatencyAndSizeInfo(opType string, size float64, latency time.Duration) {
 	if _, ok := HandlerNames[opType]; !ok {
 		return
 	}
 	HistogramSizeVec.With(map[string]string{
 		"source": opType,
 	}).Observe(size)
-	if size != 0 {
+	if size > 0 {
 		HistogramLatencyVec.With(map[string]string{
 			"source": opType,
-		}).Observe(latency / size)
+		}).Observe(latency.Seconds())
 	}
 }
 
@@ -79,7 +80,7 @@ var (
 
 	HistogramSizeVec = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "request_size",
-		Help:    "Request latency in seconds",
+		Help:    "Request size in bytes",
 		Buckets: sizeBuckets,
 	}, []string{"source"})
 )

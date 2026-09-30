@@ -128,9 +128,9 @@ func (y *YproxyRetryReader) Read(p []byte) (int, error) {
 		}
 		start := time.Now()
 		n, err := y.underlying.Read(p)
-		readTime := time.Since(start).Nanoseconds()
+		readTime := time.Since(start)
 		metrics.ReadReqProcessed.Inc()
-		metrics.StoreLatencyAndSizeInfo("READ", float64(n), float64(readTime))
+		metrics.StoreLatencyAndSizeInfo("READ", float64(n), readTime)
 		if err == io.EOF {
 			return n, err
 		}

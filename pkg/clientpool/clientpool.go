@@ -88,15 +88,15 @@ func (c *PoolImpl) Pop(id uint) (bool, error) {
 		total := cl.ByteOffset()
 		if total > 0 {
 			ct := SizeToCat(total)
-			timeTotal := time.Since(cl.OPStart()).Nanoseconds()
+			timeTotal := time.Since(cl.OPStart())
 
 			optyp := cl.OPType().String()
 			if c.opSpeed[ct][optyp] == nil {
 				c.opSpeed[ct][optyp], _ = tdigest.New()
 			}
 
-			_ = c.opSpeed[ct][optyp].Add(float64(total) / float64(timeTotal))
-			metrics.StoreLatencyAndSizeInfo(cl.OPType().String(), float64(total), float64(timeTotal))
+			_ = c.opSpeed[ct][optyp].Add(float64(total) / float64(timeTotal.Nanoseconds()))
+			metrics.StoreLatencyAndSizeInfo(cl.OPType().String(), float64(total), timeTotal)
 		}
 
 		delete(c.pool, id)

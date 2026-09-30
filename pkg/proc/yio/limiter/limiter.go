@@ -38,8 +38,7 @@ func (r *Reader) Wait(n int) error {
 	}
 	start := time.Now()
 	err := r.limiter.WaitN(r.ctx, n)
-	waitTime := time.Since(start).Nanoseconds()
-	metrics.StoreLatencyAndSizeInfo("LIMIT_READ", float64(n), float64(waitTime))
+	metrics.StoreLatencyAndSizeInfo("LIMIT_READ", float64(n), time.Since(start))
 	return err
 }
 
@@ -95,8 +94,7 @@ func NewWriter(writer io.WriteCloser, limiter *rate.Limiter) *Writer {
 func (w *Writer) Wait(n int) error {
 	start := time.Now()
 	err := w.limiter.WaitN(w.ctx, n)
-	waitTime := time.Since(start).Nanoseconds()
-	metrics.StoreLatencyAndSizeInfo("LIMIT_WRITE", float64(n), float64(waitTime))
+	metrics.StoreLatencyAndSizeInfo("LIMIT_WRITE", float64(n), time.Since(start))
 	return err
 }
 

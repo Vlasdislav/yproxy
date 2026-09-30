@@ -64,8 +64,8 @@ The output consists of 2 categories of metrics:
 |             | `read_req_errors_total` | counter | The total number of errors occurred while processing read requests |
 |             | `write_req_processed_total` | counter | The total number of processed write (upload) requests to S3 storage | 
 |             | `write_req_errors_total` | counter | The total number of errors occurred while processing write requests |
-| Internal    | `request_latency_bucket` | histogram | The number of requests and requests time for each source request |
-|             | `request_size_bucket` | histogram | The number of requests and requests size for each source request |
+| Internal    | `request_latency_bucket` | histogram | Duration in seconds of each source request |
+|             | `request_size_bucket` | histogram | Size in bytes of each source request |
 | Delete / garbage collection | `delete_process_items` | gauge | Size of the current batch of items found to process by delete handlers |
 |             | `delete_process_bytes` | gauge | Total size in bytes of the current batch found to process |
 |             | `delete_process_remaining` | gauge | Items left to process by delete handlers |

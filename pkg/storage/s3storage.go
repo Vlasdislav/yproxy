@@ -94,12 +94,12 @@ func (s *S3StorageInteractor) CatFileFromStorage(name string, offset int64, sett
 	ylogger.Zero.Debug().Str("key", objectPath).Int64("offset", offset).Str("bucket", bucket).Msg("requesting external storage")
 
 	object, err := sess.GetObject(input)
-	getTime := time.Since(timeStart).Nanoseconds()
+	getTime := time.Since(timeStart)
 	objLen := 1.0
 	if object.ContentLength != nil {
 		objLen = float64(*object.ContentLength)
 	}
-	metrics.StoreLatencyAndSizeInfo("S3_GET", objLen, float64(getTime))
+	metrics.StoreLatencyAndSizeInfo("S3_GET", objLen, getTime)
 	return object.Body, err
 }
 
@@ -168,8 +168,8 @@ func (s *S3StorageInteractor) PutFileToDest(name string, r io.Reader, settings [
 		})
 	}
 
-	putTime := time.Since(timeStart).Nanoseconds()
-	metrics.StoreLatencyAndSizeInfo("S3_PUT", float64(putLen), float64(putTime))
+	putTime := time.Since(timeStart)
+	metrics.StoreLatencyAndSizeInfo("S3_PUT", float64(putLen), putTime)
 	return err
 }
 
