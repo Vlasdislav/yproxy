@@ -33,6 +33,42 @@ type LSN struct {
 	lsn string
 }
 
+const legacyExpireHintTable = "yezzey.yezzey_expire_hint"
+
+// ensureExpireHintTable creates yproxy-owned state for postponed deletion.
+// Import the legacy Yezzey-owned hints when they are present, so upgrading
+// yproxy does not discard deletion protection recorded by an older version.
+func ensureExpireHintTable(conn *pgx.Conn) error {
+	if _, err := conn.Exec(`CREATE SCHEMA IF NOT EXISTS yproxy;`); err != nil {
+		return fmt.Errorf("create yproxy schema: %w", err)
+	}
+
+	if _, err := conn.Exec(`
+		CREATE TABLE IF NOT EXISTS yproxy.expire_hint (
+			lsn pg_lsn NOT NULL,
+			x_path text PRIMARY KEY
+		);`); err != nil {
+		return fmt.Errorf("create yproxy expire hint table: %w", err)
+	}
+
+	var legacyExists bool
+	if err := conn.QueryRow(`SELECT to_regclass($1) IS NOT NULL;`, legacyExpireHintTable).Scan(&legacyExists); err != nil {
+		return fmt.Errorf("check legacy expire hint table: %w", err)
+	}
+	if !legacyExists {
+		return nil
+	}
+
+	if _, err := conn.Exec(`
+		INSERT INTO yproxy.expire_hint (lsn, x_path)
+		SELECT lsn, x_path FROM yezzey.yezzey_expire_hint
+		ON CONFLICT (x_path) DO NOTHING;`); err != nil {
+		return fmt.Errorf("migrate legacy expire hints: %w", err)
+	}
+
+	return nil
+}
+
 func checkVersion(c *pgx.Conn, exp string) (bool, error) {
 	rows, err := c.Query(`SELECT extversion FROM pg_catalog.pg_extension WHERE extname OPERATOR(pg_catalog.=) 'yezzey';`)
 	if err != nil {
@@ -87,11 +123,15 @@ func (database *DatabaseHandler) GetVirtualExpireIndexByPrefix(port uint64, db D
 		ylogger.Zero.Warn().Err(err).Msg("GetVirtualExpireIndexByPrefix: failed")
 		return err
 	} else if ch {
+		if err := ensureExpireHintTable(conn); err != nil {
+			return err
+		}
+
 		var rows *pgx.Rows
 		if usePrefix {
-			rows, err = conn.Query(`SELECT x_path, lsn FROM yezzey.yezzey_expire_hint WHERE x_path COLLATE "C" OPERATOR(pg_catalog.>=) $1 COLLATE "C" AND x_path COLLATE "C" OPERATOR(pg_catalog.<) $2 COLLATE "C";`, lower, upper)
+			rows, err = conn.Query(`SELECT x_path, lsn FROM yproxy.expire_hint WHERE x_path COLLATE "C" OPERATOR(pg_catalog.>=) $1 COLLATE "C" AND x_path COLLATE "C" OPERATOR(pg_catalog.<) $2 COLLATE "C";`, lower, upper)
 		} else {
-			rows, err = conn.Query(`SELECT x_path, lsn FROM yezzey.yezzey_expire_hint;`)
+			rows, err = conn.Query(`SELECT x_path, lsn FROM yproxy.expire_hint;`)
 		}
 		if err != nil {
 			return fmt.Errorf("unable to get ao/aocs tables %v", err) //fix
@@ -200,9 +240,9 @@ func (database *DatabaseHandler) GetConnectToDatabase(port uint64, dbname string
 
 }
 func (database *DatabaseHandler) AddToExpireIndex(conn *pgx.Conn, port uint64, dbname string, filename string, lsn uint64) error {
-	rows, err := conn.Query(`INSERT INTO yezzey.yezzey_expire_hint (lsn,x_path) VALUES ($1 , $2);`, pgx.FormatLSN(lsn), filename)
+	rows, err := conn.Query(`INSERT INTO yproxy.expire_hint (lsn,x_path) VALUES ($1 , $2);`, pgx.FormatLSN(lsn), filename)
 	if err != nil {
-		return fmt.Errorf("unable to update yezzey_expire_hint %v", err) //fix
+		return fmt.Errorf("unable to update yproxy expire hint %v", err) //fix
 	}
 	defer rows.Close()
 
@@ -210,9 +250,9 @@ func (database *DatabaseHandler) AddToExpireIndex(conn *pgx.Conn, port uint64, d
 }
 
 func (database *DatabaseHandler) DeleteFromExpireIndex(conn *pgx.Conn, port uint64, dbname string, filename string) error {
-	rows, err := conn.Query(`DELETE FROM yezzey.yezzey_expire_hint WHERE x_path OPERATOR(pg_catalog.=) $1;`, filename)
+	rows, err := conn.Query(`DELETE FROM yproxy.expire_hint WHERE x_path OPERATOR(pg_catalog.=) $1;`, filename)
 	if err != nil {
-		return fmt.Errorf("unable to delete from yezzey_expire_hint %v", err) //fix
+		return fmt.Errorf("unable to delete from yproxy expire hint %v", err) //fix
 	}
 	defer rows.Close()
 
