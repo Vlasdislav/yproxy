@@ -7,3 +7,4 @@ https
 ssh
 ubuntu
 workarounds
+regclass
